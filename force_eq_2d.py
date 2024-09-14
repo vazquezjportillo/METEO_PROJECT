@@ -7,9 +7,6 @@ Lx = 2
 Ly = 1
 Nx = 2**8
 Ny = 2**6
-sin = np.sin
-cos = np.cos
-pi = np.pi
 
 # Grid
 x = np.linspace(0,Lx,Nx,endpoint=False)
@@ -17,10 +14,10 @@ y = np.linspace(0,Ly,Ny,endpoint=False)
 
 X,Y = np.meshgrid(x,y,indexing='ij')
 T = np.zeros((Nx,Ny))
-T1 = sin(4*pi*X)*cos(2*pi*Y) # wavenumber (4,1)
-T2 = sin(12*pi*X + 5)*cos(6*pi*Y - 3) # wavenumber (12,3)
+T1 = np.sin(4*np.pi*X)*np.cos(2*np.pi*Y) # wavenumber (4,1)
+T2 = np.sin(12*np.pi*X + 5)*np.cos(6*np.pi*Y - 3) # wavenumber (12,3)
 T_analytical = T1 + T2
-F = (-(4*pi)**2 - (2*pi)**2)*T1 + (-(12*pi)**2 - (6*pi)**2)*T2
+F = (-(4*np.pi)**2 - (2*np.pi)**2)*T1 + (-(12*np.pi)**2 - (6*np.pi)**2)*T2
 
 #####################################################################
 
@@ -37,8 +34,8 @@ def Y_derivative(kx,ky,T_hat):
     return 1j*ky*T_hat
 
 def wavenumbers():
-    kx = np.fft.fftfreq(Nx)*Nx*(2*pi/Lx)
-    ky = np.fft.fftfreq(Ny)*Ny*(2*pi/Ly)  
+    kx = np.fft.fftfreq(Nx)*Nx*(2*np.pi/Lx)
+    ky = np.fft.fftfreq(Ny)*Ny*(2*np.pi/Ly)  
     return kx, ky
 
 #You can also define a normalized coordinate x_star = 2*pi*x/Lx and y_star = 2*pi*y/Ly

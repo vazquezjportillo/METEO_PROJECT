@@ -39,29 +39,3 @@ plt.loglog(np.arange(4,14),error)
 plt.figure()
 plt.loglog(np.arange(4,14),elapsed_time)
 plt.show()
-#     fig, axs = plt.subplots(2, 1, figsize=(10, 8))
-
-#     # Plot the analytical solution
-#     contour1 = axs[0].contourf(X, Y, T_analytical)
-#     fig.colorbar(contour1, ax=axs[0])
-#     axs[0].set_title('Analytical Solution')
-
-#     # Plot the computed solution
-#     contour2 = axs[1].contourf(X, Y, T)
-#     fig.colorbar(contour2, ax=axs[1])
-#     axs[1].set_title('Spectral Methods Solution')
-
-#     plt.tight_layout()
-#     plt.show()
-    
-# print(error)
-# Nx_values = [2**i for i in range(4, 7)]
-# print(Nx_values)
-
-# plt.plot(Nx_values, error, marker='o', linestyle='-', color='b', label='Error Norm')
-# plt.xlabel('Nx')
-# plt.ylabel('Error Norm')
-# plt.title('Error Norm vs Nx')
-# plt.grid(True)
-# plt.legend()
-# plt.show()
