@@ -1,111 +1,92 @@
 import numpy as np 
 import matplotlib.pyplot as plt
 import time
-    
+
+#####################################################################
+# Helmholtz equation in 3D
+# Laplace(T) + epsilon*T = f(x,y,z)
+#
+# Previously knowing the analytical solution T, we can compute f(x,y,z)
+# for testing our implementation.
+#
+# Spectral methods for X and Y where X real FFT and central finite 
+# differences for Z. 
+# Esquema:
+# (epsilon - (kx**2 + ky**2))*T_hat1 + (T_hat2 - 2*T_hat1 + T_hat0)/(dz**2)= F_hat1
+#####################################################################
+
 # Parameters
-Lx = 2
-Ly = 1
-Lz = 1
-Xc = Lx/2
-Yc = Ly/2
-Zc = Lz/2
-Nx = 2**6
-Ny = 2**6
-Nz = 2**6
-alpha = 0.01
-beta = 0.01
-gamma = 0.01
+Lx = 2;             Ly = 1;             Lz = 1
+Xc = Lx/2;          Yc = Ly/2;          Zc = Lz/2
+Nx = 2**6;          Ny = 2**6;          Nz = 200
+alpha = 0.01;       beta = 0.01;        gamma = 0.01
 epsilon = 1
-dz = 0.001 
 
 # Grid
 x = np.linspace(0,Lx,Nx,endpoint=False)
 y = np.linspace(0,Ly,Ny,endpoint=False)
-z = np.linspace(0,Lz,Nz,endpoint=False)
-
+z = np.linspace(0,Lz,Nz)
+dz = z[1]-z[0]
 X,Y,Z = np.meshgrid(x,y,z,indexing='ij')
-T = np.zeros((Nx,Ny))
-# T1 = np.sin(4*np.pi*X)*np.cos(2*np.pi*Y) # wavenumber (4,1)
-# T2 = np.sin(12*np.pi*X + 5)*np.cos(6*np.pi*Y - 3) # wavenumber (12,3)
-# T_analytical = T1 + T2
-# F = (-(4*np.pi)**2 - (2*np.pi)**2)*T1 + (-(12*np.pi)**2 - (6*np.pi)**2)*T2 + epsilon*(T1 + T2)
 
+# Function definition
 expo = np.exp(-(X-Xc)**2/alpha - (Y-Yc)**2/beta - (Z-Zc)**2/gamma)
 T_analytical = expo + Z**2
-F = (-2/alpha + 4*(X-Xc)**2/alpha**2 - 2/beta + 4*(Y-Yc)**2/beta**2 - 2/gamma + 4*(Z-Zc)**2/gamma**2)*expo + 2 + epsilon*(expo + Z**2)
+F = (-2/alpha + 4*(X-Xc)**2/alpha**2 - 2/beta + 4*(Y-Yc)**2/beta**2 - \
+     2/gamma + 4*(Z-Zc)**2/gamma**2)*expo + 2 + epsilon*(expo + Z**2)
+
 #####################################################################
 
 def transform(T):
-    return np.fft.fftn(T)
+    return np.fft.rfft2(T,axes=(1,0)) 
+#Real axe is the X axe (1,0). For having the Y axe: (0,1).
 
 def inverse_transform(T_hat):
-    return np.fft.ifftn(T_hat).real
+    return np.fft.irfft2(T_hat,axes=(1,0))
 
 def wavenumbers():
-    kx = np.fft.fftfreq(Nx)*Nx*(2*np.pi/Lx)
+    kx = np.fft.rfftfreq(Nx)*Nx*(2*np.pi/Lx)
     ky = np.fft.fftfreq(Ny)*Ny*(2*np.pi/Ly)
-    kz = np.fft.fftfreq(Nz)*Nz*(2*np.pi/Lz)  
-    return kx, ky, kz  
+    return kx, ky  
 
-#You can also define a normalized coordinate x_star = 2*pi*x/Lx and y_star = 2*pi*y/Ly
-#BUT YOU NEED TO BE CAREFUL WITH THE DERIVATIVES
+# You can also define a normalized coordinate 
+# x_star = 2*pi*x/Lx and y_star = 2*pi*y/Ly
+# BUT YOU NEED TO BE CAREFUL WITH THE DERIVATIVES
 
+#####################################################################
+kx,ky = wavenumbers()
+F_hat = transform(F)
+T_hat = np.zeros((Nx//2+1,Ny,Nz),dtype=complex)
 
-kx,ky,kz=wavenumbers()
-F_hat=transform(F)
-T_hat=np.zeros((Nx,Ny,Nz),dtype=complex)
+# Esquema:
+# [epsilon-(kx**2 + ky**2)]*I + D]*T_hat= F_hat
+# We need to include in D the CFD for Z:
+# (T_hat2 - 2*T_hat1 + T_hat0)/(dz**2)= F_hat1
+D = np.diag(-2/dz**2*np.ones(Nz)) + np.diag(1/dz**2*np.ones(Nz-1),1) + \
+    np.diag(1/dz**2*np.ones(Nz-1),-1) 
+# Defines a tridiagonal matrix with -2/dz**2 in the diagonal and 1/dz**2 in the upper and lower diagonals 
 
+# BC:
+D[[0,-1],]=0  # First and last rows are zero
+D[0,0]=1
+D[-1,-1]=1
 
+I = np.eye(Nz)
+I[[0,-1]]=0
+ 
+F_hat[:,:,[0,-1]]=0
+F_hat[0,0,-1]=Nx*Ny*1
 
-KX, KY, KZ = np.meshgrid(kx, ky, kz, indexing='ij')
-
-ksq = KX**2 + KY**2 
-b = epsilon - ksq - 2/dz**2
-a = 1/dz**2
-
-for i in range(Nx):
-    for j in range(Ny):
-        A = np.zeros((Nz, Nz))
-        
-        for k in range(1, Nz-1):
-            A[k, k-1] = a          
-            A[k, k] = b[i,j,k] 
-            A[k, k+1] = a           
-        
-        # Apply boundary conditions
-        A[0, 0] = 1
-        A[-1, -1] = 1
-        A[0, 1:] = 0
-        A[-1, :-1] = 0
-        
-        T_hat_slice = np.linalg.solve(A, F_hat[i, j, :])
-        T_hat[i,j,:] = T_hat_slice
+t1=time.time()
+for i in range(Nx//2+1):
+    for j in range(Ny):        
+        T_hat[i,j] = np.linalg.solve((epsilon-kx[i]**2-ky[j]**2)*I + \
+            D, F_hat[i, j])
+t2=time.time()
+print(t2-t1)
 
 T=inverse_transform(T_hat)
 #####################################################################
 
 
-fig, axs = plt.subplots(2, 1, figsize=(10, 8))
-
-# Plot the analytical solution
-contour1 = axs[0].contourf(X[:,:,40], Y[:,:,40], T_analytical[:,:,40])
-fig.colorbar(contour1, ax=axs[0])
-axs[0].set_title('Analytical Solution')
-
-# Plot the computed solution
-contour2 = axs[1].contourf(X[:,:,40], Y[:,:,40], T[:,:,40])
-fig.colorbar(contour2, ax=axs[1])
-axs[1].set_title('Spectral Methods Solution')
-
-plt.tight_layout()
-plt.show()
-
-# Additional diagnostics
-print("Maximum and minimum values in the computed solution:")
-print(f"Max: {np.max(T)}")
-print(f"Min: {np.min(T)}")
-
-# Additional diagnostics
-print("Maximum and minimum values in the analytic solution:")
-print(f"Max: {np.max(T_analytical)}")
-print(f"Min: {np.min(T_analytical)}")
+print('maximum error:',np.max(np.abs(T-T_analytical)))
