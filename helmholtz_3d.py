@@ -1,7 +1,9 @@
 import numpy as np 
-import matplotlib.pyplot as plt
-import time
+from line_profiler import LineProfiler
+from scipy.linalg import solve_banded
 
+
+#region INTRODUCTION
 #####################################################################
 # Helmholtz equation in 3D
 # Laplace(T) + epsilon*T = f(x,y,z)
@@ -14,6 +16,7 @@ import time
 # Esquema:
 # (epsilon - (kx**2 + ky**2))*T_hat1 + (T_hat2 - 2*T_hat1 + T_hat0)/(dz**2)= F_hat1
 #####################################################################
+#endregion
 
 # Parameters
 Lx = 2;             Ly = 1;             Lz = 1
@@ -29,7 +32,7 @@ z = np.linspace(0,Lz,Nz)
 dz = z[1]-z[0]
 X,Y,Z = np.meshgrid(x,y,z,indexing='ij')
 
-# Function definition
+# Functions definition
 expo = np.exp(-(X-Xc)**2/alpha - (Y-Yc)**2/beta - (Z-Zc)**2/gamma)
 T_analytical = expo + Z**2
 F = (-2/alpha + 4*(X-Xc)**2/alpha**2 - 2/beta + 4*(Y-Yc)**2/beta**2 - \
@@ -54,39 +57,51 @@ def wavenumbers():
 # BUT YOU NEED TO BE CAREFUL WITH THE DERIVATIVES
 
 #####################################################################
-kx,ky = wavenumbers()
-F_hat = transform(F)
-T_hat = np.zeros((Nx//2+1,Ny,Nz),dtype=complex)
+def helmholtz_3d(F,Nx,Ny,Nz,epsilon):
+    
+    kx,ky = wavenumbers()
+    F_hat = transform(F)
+    T_hat = np.zeros((Nx//2+1,Ny,Nz),dtype=complex)
 
-# Esquema:
-# [epsilon-(kx**2 + ky**2)]*I + D]*T_hat= F_hat
-# We need to include in D the CFD for Z:
-# (T_hat2 - 2*T_hat1 + T_hat0)/(dz**2)= F_hat1
-D = np.diag(-2/dz**2*np.ones(Nz)) + np.diag(1/dz**2*np.ones(Nz-1),1) + \
-    np.diag(1/dz**2*np.ones(Nz-1),-1) 
-# Defines a tridiagonal matrix with -2/dz**2 in the diagonal and 1/dz**2 in the upper and lower diagonals 
+    # Esquema:
+    # [epsilon-(kx**2 + ky**2)]*I + D]*T_hat= F_hat
+    # We need to include in D the CFD for Z:
+    # (T_hat2 - 2*T_hat1 + T_hat0)/(dz**2)= F_hat1
+    D = np.diag(-2/dz**2*np.ones(Nz)) + np.diag(1/dz**2*np.ones(Nz-1),1) + \
+        np.diag(1/dz**2*np.ones(Nz-1),-1) 
+    # Defines a tridiagonal matrix with -2/dz**2 in the diagonal and 1/dz**2 in the upper and lower diagonals 
 
-# BC:
-D[[0,-1],]=0  # First and last rows are zero
-D[0,0]=1
-D[-1,-1]=1
+    # BC:
+    D[[0,-1],]=0  # First and last rows are zero
+    D[0,0]=1
+    D[-1,-1]=1
+    
+        # Precompute the banded form of D
+    D_banded = np.zeros((3, Nz))
+    D_banded[0, 1:] = np.diag(D, k=1)    # Upper diagonal, shifted right
+    D_banded[1, :] = np.diag(D)          # Main diagonal
+    D_banded[2, :-1] = np.diag(D, k=-1)  # Lower diagonal, shifted left
 
-I = np.eye(Nz)
-I[[0,-1]]=0
+
+    I = np.eye(Nz)
+    I[[0,-1]]=0
  
-F_hat[:,:,[0,-1]]=0
-F_hat[0,0,-1]=Nx*Ny*1
+    F_hat[:,:,[0,-1]]=0
+    F_hat[0,0,-1]=Nx*Ny*1
 
-t1=time.time()
-for i in range(Nx//2+1):
-    for j in range(Ny):        
-        T_hat[i,j] = np.linalg.solve((epsilon-kx[i]**2-ky[j]**2)*I + \
-            D, F_hat[i, j])
-t2=time.time()
-print(t2-t1)
+    for i in range(Nx//2+1):  # We only need to compute the first half of the spectrum
+        for j in range(Ny):        
+            D_banded[1, :] = np.diag(D) + (epsilon - kx[i]**2 - ky[j]**2) * np.diag(I)
+            T_hat[i,j] = solve_banded((1,1), D_banded, F_hat[i, j])
 
-T=inverse_transform(T_hat)
+    return inverse_transform(T_hat)
+
 #####################################################################
 
-
+T = helmholtz_3d(F,Nx,Ny,Nz,epsilon)
 print('maximum error:',np.max(np.abs(T-T_analytical)))
+
+lp = LineProfiler()
+lp_wrapper = lp(helmholtz_3d)
+lp_wrapper(F,Nx,Ny,Nz,epsilon)
+lp.print_stats()
