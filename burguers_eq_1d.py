@@ -23,6 +23,16 @@ def transform(u):
     u_hat = np.fft.fft(u)
     return np.concatenate((u_hat[:Nx//2],[0],u_hat[-Nx//2+1:]))
 
+
+# To deal with aliasing we are going to:
+# 1. Go to Spectral space
+# 2. Extend the spectral espace up to 3/2 (Nx//2)
+# 4. Return to physical space
+# 5. Compute the derivative in physical space
+# 6. Return to spectral space
+# 7. Truncate the spectral space to Nx//2
+
+
 def inverse_transform(u_hat,aliasing=False):
     if aliasing:
         u_hat2=np.zeros(3*Nx//2,dtype=np.complex128)
