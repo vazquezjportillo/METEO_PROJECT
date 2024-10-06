@@ -9,6 +9,15 @@ def inverse_transform(F_hat,aliasing=False):
     else:
         return np.fft.irfft2(F_hat,axes=(1,0))
     
+def inverse_transform2D(F_hat,aliasing=False):
+    if aliasing:
+        F_hat2=np.zeros((3*F_hat.shape[0]//2,F_hat.shape[1]),dtype=np.complex128)
+        F_hat2[:F_hat.shape[0]//2,:]=F_hat[:F_hat.shape[0]//2,:]
+        F_hat2[-F_hat.shape[0]//2+1:,:]=F_hat[-F_hat.shape[0]//2+1:,:]
+        return np.fft.irfft2(F_hat,axes=(1,0))
+    else:
+        return np.fft.irfft2(F_hat,axes=(1,0))
+    
 def transform(F):
     return np.fft.rfft2(F,axes=(1,0))
     
