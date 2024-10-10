@@ -8,8 +8,8 @@ from scipy.linalg import solve_banded
 ############################################################################
 
 Lx = 8e6;           Ly = 8e6;                 Lz = 1e4
-Nx = 2**6;          Ny = 2**2;              Nz = 50
-t = 0;              tmax = 3600*24*20;         dt=1000
+Nx = 2**6;          Ny = 2**3;              Nz = 50
+t = 0;              tmax = 3600*24*10;         dt=1000
 
 N = 1e-2
 nu = 0      # Damping term in potential vorticity
@@ -47,7 +47,6 @@ DPSI_top=-Umax/Lz*Y
 for i in range(Nz):
     # q[:,:,i]+= 1e-4*np.exp(-(X-Xc)**2/2/alphax**2-(Y-Yc)**2/2/alphay**2-(z[i]-Zc)**2/2/alphaz**2) # small perturbation
     q[:,:,i]+= 1e-8*np.exp(-(z[i]-Zc)**2/2/alphaz**2)*np.sin(kx[2]*X)
-print(kx[6]*Ld)
 ############################################################################
 
 # Fourier analysis
@@ -152,24 +151,40 @@ def Euler(q_hat,DPSI_bottom_hat,DPSI_top_hat):
     
 ############################################################################
     
-for s in range(int(tmax//dt)):
-    # print(s)
-    Euler(q_hat, DPSI_bottom_hat, DPSI_top_hat)
+# for s in range(int(tmax//dt)):
+#     # print(s)
+#     Euler(q_hat, DPSI_bottom_hat, DPSI_top_hat)
 
-    # DPSI_bottom_hat *= np.exp(-nuBC * dt)
-    # DPSI_top_hat *= np.exp(-nuBC * dt)
+#     # DPSI_bottom_hat *= np.exp(-nuBC * dt)
+#     # DPSI_top_hat *= np.exp(-nuBC * dt)
 
 
-plt.subplot(121)
-u=inverse_transform(u_hat)
-plt.contourf((u[:,Ny//2,:]-U0).T,levels=18)
-plt.xlabel('x')
-plt.ylabel('z')
-plt.title('u')
-plt.colorbar()
-plt.subplot(122)
-v=inverse_transform(v_hat)
-plt.contourf(v[:,Ny//2,:].T,levels=18)
+# plt.subplot(121)
+# u=inverse_transform(u_hat)
+# plt.contourf((u[:,Ny//2,:]-U0).T,levels=18)
+# plt.xlabel('x')
+# plt.ylabel('z')
+# plt.title('u')
+# plt.colorbar()
+# plt.subplot(122)
+# v=inverse_transform(v_hat)
+# plt.contourf(v[:,Ny//2,:].T,levels=18)
+# plt.colorbar()
+# plt.xlabel('x')
+# plt.ylabel('z')
+# plt.title('v')
+# plt.show()
+
+X,Y,Z = np.meshgrid(x,y,z, indexing='ij')
+
+def psi(z,Ld,kx_perturbation,ky_perturbation,c):
+    mu = np.sqrt(Ld**2 * (kx_perturbation**2 + ky_perturbation**2))
+    c = Umax/2 + (Umax/mu)*np.sqrt((mu/2 - 1 / np.tanh(mu/2))*(mu/2 - np.tanh(mu/2)))
+    return np.cosh((z/Lz)*mu) - (Umax/(mu*c))*np.sinh(mu*(z/Lz)), c
+
+psi_analytical = psi(Z,Ld,kx[1],ky[3],U0)[0]*np.sin(ky[3]*(Y/Lz))*np.exp(1j*kx[1]*(X/Lz - psi(Z,Ld,kx[2],ky[3],U0)[1]*tmax))
+
+plt.contourf(psi_analytical[:,Ny//2,:].T,levels=18)
 plt.colorbar()
 plt.xlabel('x')
 plt.ylabel('z')
