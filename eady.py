@@ -1,26 +1,29 @@
 import numpy as np 
 import matplotlib.pyplot as plt
-from functions import transform, inverse_transform, wavenumbers, inverse_transform2D
+from functions import transform, inverse_transform, wavenumbers
 from scipy.linalg import solve_banded
+from line_profiler import LineProfiler
+
+
 ############################################################################
 # Parameters
 ############################################################################
 
-Lx = 8e6;           Ly = 8e6;                 Lz = 1e4
-Nx = 2**6;          Ny = 2**2;              Nz = 20
-t = 0;              tmax = 3600*24*10;         dt=1000
+Lx = 1e6;           Ly = Lx;                 Lz = 1e4
+Nx = 2**6;          Ny = 2**1;                  Nz = 32
+t = 0;              tmax = 3600*24*6;         dt=100
 
-N = 1e-2
-nu = 0     # Damping term in potential vorticity
+N = 5e-3
+nu = 10000      # Damping term in potential vorticity
 f0=1e-4
 Umax=10
 
-nuBC = 0    # Damping term in boundary conditions
 Ld=N*Lz/f0
+Bu = Ld/Lx
 #####################
 #Normalization
 Xc = Lx/2;          Yc= Ly/2;               Zc = Lz/2
-alphax = Lx/20;     alphay = Ly/20;       alphaz = Lz/20
+alphax = Lx/20;     alphay = Ly/20;       alphaz = Lz/100
 
 ############################################################################
 
@@ -32,19 +35,26 @@ dz = z[1]-z[0]
 X,Y = np.meshgrid(x,y,indexing='ij')
 
 U0=Umax/Lz*z
-V0=np.zeros_like(U0)
+dU0dz=Umax/Lz*np.ones_like(z)
+d2U0dz2=np.zeros_like(z)
 
 ############################################################################
 
 kx,ky = wavenumbers(Nx,Ny,Lx,Ly)
-# initial conditions
+
+# initial conditions (perturbations only)
 q = np.zeros((Nx,Ny,Nz))
 DPSI_bottom=np.zeros((Nx,Ny))
 DPSI_top=np.zeros((Nx,Ny))
 
+Z = Bu*(z/Lz - 0.5)
+n = 1/Bu * np.sqrt(((Bu/2 - np.tanh(Bu/2))*((1/np.tanh(Bu/2))-Bu/2)))
+
 for i in range(Nz):
-    # q[:,:,i]+= 1e-4*np.exp(-(X-Xc)**2/2/alphax**2-(Y-Yc)**2/2/alphay**2-(z[i]-Zc)**2/2/alphaz**2) # small perturbation
-    q[:,:,i]+= 1e-8*np.exp(-(z[i]-Zc)**2/2/alphaz**2)*np.sin(kx[2]*X)
+    q[:,:,i]+= 1e-4*np.exp(-(z[i]-Zc)**2/2/alphaz**2)*np.sin(kx[1]*X)
+    # q[:,:,i]+= 1e-10*N*(-(1 - Bu/2*(1/np.tanh(Bu/2)))*np.sinh(Z[i])*np.cosh(kx[1]*X) - n*Bu*np.cosh(Z[i])*np.sin(kx[1]*X))
+############################################################################
+
 ############################################################################
 
 # Fourier analysis
@@ -53,6 +63,7 @@ DPSI_bottom_hat = transform(DPSI_bottom)
 DPSI_top_hat=transform(DPSI_top)
 u_hat=np.zeros_like(q_hat)
 v_hat=np.zeros_like(q_hat)
+w_hat=np.zeros_like(q_hat)
 
 ############################################################################
 
@@ -84,26 +95,28 @@ def linear_term(q_hat,DPSI_bottom_hat,DPSI_top_hat):
     psi_hat=np.zeros_like(B_hat)
     for i in range(Nx//2+1):  # We only need to compute the first half of the spectrum
         for j in range(Ny): 
-            if i+j>0:       
+            if i+j>0:     
                 D_banded[1, 1:-1] = base - (kx[i]**2 + ky[j]**2)
                 B_hat[1:-1] = q_hat[i,j,1:-1]
                 B_hat[0] = DPSI_bottom_hat[i,j]
                 B_hat[-1] = DPSI_top_hat[i,j]
                 psi_hat[:] = solve_banded((1,1), D_banded, B_hat)
-                u_hat[i,j]=-1j*ky[j]*psi_hat
                 v_hat[i,j]=1j*kx[i]*psi_hat
             else:
-                u_hat[i,j]=U0*Nx*Ny
-                v_hat[i,j]=V0*Nx*Ny
+                v_hat[i,j]=0
 
-    nlt_q = U0*inverse_transform((1j*kx*q_hat.T).T)
+    #All terms are linear now 
+
+    nlt_q = U0*(1j*kx*q_hat.T).T - v_hat*(f0/N)**2*d2U0dz2 
     
-    nlt_bottom = inverse_transform2D(v_hat[:,:,0]) * (-Umax/Lz)
+    nlt_bottom = U0[0] * (1j*kx*DPSI_bottom_hat.T).T
+    nlt_bottom += v_hat[:,:,0] * (-dU0dz[0])
         
-    nlt_top = U0[-1] * inverse_transform2D((1j*kx*DPSI_top_hat.T).T)
-    nlt_top += inverse_transform2D(v_hat[:,:,-1]) * (-Umax/Lz)
-            
-    return transform(nlt_q), transform(nlt_bottom), transform(nlt_top)
+    nlt_top = U0[-1] * (1j*kx*DPSI_top_hat.T).T
+    nlt_top += v_hat[:,:,-1] * (-dU0dz[-1])
+    V=inverse_transform(v_hat)
+
+    return nlt_q, nlt_bottom, nlt_top, np.max(np.abs(V))
 
 ############################################################################
 
@@ -123,130 +136,57 @@ def nonlinear_term(q_hat,DPSI_bottom_hat,DPSI_top_hat):
                 v_hat[i,j]=1j*kx[i]*psi_hat
             else:
                 u_hat[i,j]=U0*Nx*Ny
-                v_hat[i,j]=V0*Nx*Ny
+                v_hat[i,j]=0
 
-    nlt_q = inverse_transform(u_hat)*inverse_transform((1j*kx*q_hat.T).T)
-    nlt_q += inverse_transform(v_hat)*inverse_transform(np.moveaxis(1j*ky*np.moveaxis(q_hat,1,-1),-1,1))
-    
-    nlt_bottom = inverse_transform2D(u_hat[:,:,0]) * inverse_transform2D((1j*kx*DPSI_bottom_hat.T).T)
-    nlt_bottom += inverse_transform2D(v_hat[:,:,0]) * (inverse_transform2D(1j*ky*DPSI_bottom_hat)-Umax/Lz)
+    V=inverse_transform(v_hat,True)
+    nlt_q = inverse_transform(u_hat,True)*inverse_transform((1j*kx*q_hat.T).T,True) 
+    nlt_q += V*(inverse_transform(np.moveaxis(1j*ky*np.moveaxis(q_hat,1,-1),-1,1),True) - (f0/N)**2*d2U0dz2)
+
+    nlt_bottom = inverse_transform(u_hat[:,:,0],True) * inverse_transform((1j*kx*DPSI_bottom_hat.T).T,True)
+    nlt_bottom += inverse_transform(v_hat[:,:,0],True) * (inverse_transform(1j*ky*DPSI_bottom_hat,True)-dU0dz[0])
         
-    nlt_top = inverse_transform2D(u_hat[:,:,-1]) * inverse_transform2D((1j*kx*DPSI_top_hat.T).T)
-    nlt_top += inverse_transform2D(v_hat[:,:,-1]) * (inverse_transform2D(1j*ky*DPSI_top_hat)-U0[-1]/Lz)
+    nlt_top = inverse_transform(u_hat[:,:,-1],True) * inverse_transform((1j*kx*DPSI_top_hat.T).T,True)
+    nlt_top += inverse_transform(v_hat[:,:,-1],True) * (inverse_transform(1j*ky*DPSI_top_hat,True)-dU0dz[-1])
             
-    return transform(nlt_q), transform(nlt_bottom), transform(nlt_top)
+    return transform(nlt_q,True), transform(nlt_bottom,True), transform(nlt_top,True),np.max(np.abs(V))
 
-def Euler_explicit(q_hat,DPSI_bottom_hat,DPSI_top_hat):
-    NLT_q_hat,NLT_bottom_hat,NLT_top_hat=nonlinear_term(q_hat,DPSI_bottom_hat,DPSI_top_hat)
+############################################################################
+
+def Euler(q_hat,DPSI_bottom_hat,DPSI_top_hat):
+    NLT_q_hat,NLT_bottom_hat,NLT_top_hat,maxV=nonlinear_term(q_hat,DPSI_bottom_hat,DPSI_top_hat)
     
     q_hat-=dt*NLT_q_hat
     for i in range(Nz):
         q_hat[:,:,i]/=1+dt*nu*(np.repeat(kx[:,np.newaxis]**2,Ny,1)+ky**2)
-        
-        # U0[i] = np.mean(inverse_transform(u_hat)[:, :, i])/Lz*z[i]
-    # plt.figure()
-    # plt.plot(U0, z, label='U0')
-    # plt.xlabel('U0')
-    # plt.ylabel('z')
-    # plt.title('U0 vs z')
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
-    
-    
     DPSI_bottom_hat-=dt*NLT_bottom_hat
     DPSI_top_hat-=dt*NLT_top_hat
+    return maxV
+
+lp = LineProfiler()
+lp_wrapper = lp(Euler)
+lp_wrapper(q_hat,DPSI_bottom_hat,DPSI_top_hat)
+lp.print_stats()
     
 ############################################################################
-def velocity_term(q_hat,DPSI_bottom_hat,DPSI_top_hat):
     
-    B_hat=np.zeros(Nz,dtype=np.complex128)
-    psi_hat=np.zeros_like(B_hat)
-    for i in range(Nx//2+1):  # We only need to compute the first half of the spectrum
-        for j in range(Ny): 
-            if i+j>0:       
-                D_banded[1, 1:-1] = base - (kx[i]**2 + ky[j]**2)
-                B_hat[1:-1] = q_hat[i,j,1:-1]
-                B_hat[0] = DPSI_bottom_hat[i,j]
-                B_hat[-1] = DPSI_top_hat[i,j]
-                psi_hat[:] = solve_banded((1,1), D_banded, B_hat)
-                u_hat[i,j]=-1j*ky[j]*psi_hat
-                v_hat[i,j]=1j*kx[i]*psi_hat
-            else:
-                u_hat[i,j]=U0*Nx*Ny
-                v_hat[i,j]=V0*Nx*Ny
-            
-    return u_hat, v_hat
 
-def Euler_implicit(q_hat,DPSI_bottom_hat,DPSI_top_hat):
-    u_hat, v_hat = velocity_term(q_hat,DPSI_bottom_hat,DPSI_top_hat)
-    q_hat = q_hat**-1
-    q_hat+=dt*transform(inverse_transform(u_hat)*inverse_transform((1j*kx*(q_hat.T)**-1).T))
-    q_hat+=dt*transform(inverse_transform(v_hat)*inverse_transform(np.moveaxis(1j*ky*np.moveaxis((q_hat)**-1,1,-1),-1,1)))
-    q_hat = q_hat**-1
-    
-    DPSI_bottom_hat = DPSI_bottom_hat**-1
-    DPSI_bottom_hat+=dt*transform(inverse_transform2D(u_hat[:,:,0])*inverse_transform((1j*kx*(DPSI_bottom_hat.T)**-1).T))
-    DPSI_bottom_hat+=dt*transform(inverse_transform2D(v_hat[:,:,0])*(inverse_transform2D(1j*ky*DPSI_bottom_hat**-1)-Umax/Lz))
-    DPSI_bottom_hat = DPSI_bottom_hat**-1
-    
-    DPSI_top_hat = DPSI_top_hat**-1
-    DPSI_top_hat+=dt*transform(inverse_transform2D(u_hat[:,:,-1])*inverse_transform((1j*kx*(DPSI_top_hat.T)**-1).T))
-    DPSI_top_hat+=dt*transform(inverse_transform2D(v_hat[:,:,-1])*(inverse_transform2D(1j*ky*DPSI_top_hat**-1)-Umax/Lz))
-    DPSI_top_hat = DPSI_top_hat**-1
-############################################################################
-    
-for s in range(int(tmax//dt)):
-    # print(s)
-    Euler_explicit(q_hat, DPSI_bottom_hat, DPSI_top_hat)
-    
-    # u=inverse_transform(u_hat)
-    # v=inverse_transform(v_hat)
-    # max_velocity = np.max(np.sqrt(u**2 + v**2))
+# for s in range(int(tmax//dt)):
+#     maxV=Euler(q_hat, DPSI_bottom_hat, DPSI_top_hat)
+#     plt.plot(s,maxV,'ob')
 
-    # # Calculate dx and dy
-    # dx = Lx / Nx
-    # dy = Ly / Ny
-
-    # # Calculate the CFL condition
-    # cfl_x = max_velocity * dt / dx
-    # cfl_y = max_velocity * dt / dy
-
-    # print(f"Max velocity: {max_velocity}")
-
-    # print(f"CFL condition in x direction: {cfl_x}")
-    # print(f"CFL condition in y direction: {cfl_y}")
-
-
-plt.subplot(121)
-u=inverse_transform(u_hat)
-plt.contourf((u[:,Ny//2,:]-U0).T,levels=18)
-plt.xlabel('x')
-plt.ylabel('z')
-plt.title('u')
-plt.colorbar()
-plt.subplot(122)
-v=inverse_transform(v_hat)
-plt.contourf(v[:,Ny//2,:].T,levels=18)
-plt.colorbar()
-plt.xlabel('x')
-plt.ylabel('z')
-plt.title('v')
-plt.show()
-
-u=inverse_transform(u_hat)
-v=inverse_transform(v_hat)
-max_velocity = np.max(np.sqrt(u**2 + v**2))
-
-# Calculate dx and dy
-dx = Lx / Nx
-dy = Ly / Ny
-
-# Calculate the CFL condition
-cfl_x = max_velocity * dt / dx
-cfl_y = max_velocity * dt / dy
-
-print(f"Max velocity: {max_velocity}")
-
-print(f"CFL condition in x direction: {cfl_x}")
-print(f"CFL condition in y direction: {cfl_y}")
+# plt.figure()
+# plt.subplot(121)
+# u=inverse_transform(u_hat)
+# plt.contourf(u[:,Ny//2,:].T,levels=18)
+# plt.xlabel('x')
+# plt.ylabel('z')
+# plt.title('u')
+# plt.colorbar()
+# plt.subplot(122)
+# v=inverse_transform(v_hat)
+# plt.contourf(v[:,Ny//2,:].T,levels=18)
+# plt.colorbar()
+# plt.xlabel('x')
+# plt.ylabel('z')
+# plt.title('v')
+# plt.show()

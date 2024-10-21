@@ -50,7 +50,10 @@ def wavenumbers():
     
 kx=wavenumbers()
 
+print(u.shape)
 u_hat=transform(u)
+print(u_hat.shape)
+print(kx.shape)
 
 
 t1=time.time()
