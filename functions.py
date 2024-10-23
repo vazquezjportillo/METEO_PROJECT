@@ -13,6 +13,7 @@ def inverse_transform(F_hat,dealiasing=False):
     else:
         F_hat2=F_hat
     return np.fft.irfft2(F_hat2,axes=(1,0))
+
     
 def transform(F,dealiasing=False):
     F_hat=np.fft.rfft2(F, axes=(1, 0))
@@ -39,12 +40,6 @@ def transform(F,dealiasing=False):
     F_hat2[-1]=0       
     return F_hat2
 
-    
-def X_derivative(kx,ky,Nx,T_hat):
-    return 1j*(kx*T_hat)
-
-def Y_derivative(kx,ky,Nx,T_hat):
-    return 1j*ky*T_hat
 
 def wavenumbers(Nx,Ny,Lx,Ly):
     kx = np.fft.rfftfreq(Nx)*Nx*(2*np.pi/Lx)

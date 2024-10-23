@@ -11,14 +11,14 @@ from line_profiler import LineProfiler
 
 Lx = 1e6;           Ly = Lx;                 Lz = 1e4
 Nx = 2**6;          Ny = 2**1;                  Nz = 32
-t = 0;              tmax = 3600*24*6;         dt=100
+t = 0;              tmax = 3600*24*13;         dt=300
 
-N = 5e-3
-nu = 10000      # Damping term in potential vorticity
-f0=1e-4
-Umax=10
+N = 5e-3    # Brunt-Vaisala frequency
+nu = 0      # Damping term in potential vorticity
+f0 = 1e-4
 
-Ld=N*Lz/f0
+
+Ld = N*Lz/f0
 Bu = Ld/Lx
 #####################
 #Normalization
@@ -33,7 +33,7 @@ y = np.linspace(0,Ly,Ny,endpoint=False)
 z = np.linspace(0,Lz,Nz)
 dz = z[1]-z[0]
 X,Y = np.meshgrid(x,y,indexing='ij')
-
+Umax=5
 U0=Umax/Lz*z
 dU0dz=Umax/Lz*np.ones_like(z)
 d2U0dz2=np.zeros_like(z)
@@ -47,11 +47,11 @@ q = np.zeros((Nx,Ny,Nz))
 DPSI_bottom=np.zeros((Nx,Ny))
 DPSI_top=np.zeros((Nx,Ny))
 
-Z = Bu*(z/Lz - 0.5)
-n = 1/Bu * np.sqrt(((Bu/2 - np.tanh(Bu/2))*((1/np.tanh(Bu/2))-Bu/2)))
+# Z = Bu*(z/Lz - 0.5)
+# n = 1/Bu * np.sqrt(((Bu/2 - np.tanh(Bu/2))*((1/np.tanh(Bu/2))-Bu/2)))
 
 for i in range(Nz):
-    q[:,:,i]+= 1e-4*np.exp(-(z[i]-Zc)**2/2/alphaz**2)*np.sin(kx[1]*X)
+    q[:,:,i]+= 1e-3*np.exp(-(z[i]-Zc)**2/2/alphaz**2)*np.sin(kx[1]*X)
     # q[:,:,i]+= 1e-10*N*(-(1 - Bu/2*(1/np.tanh(Bu/2)))*np.sinh(Z[i])*np.cosh(kx[1]*X) - n*Bu*np.cosh(Z[i])*np.sin(kx[1]*X))
 ############################################################################
 
@@ -63,7 +63,6 @@ DPSI_bottom_hat = transform(DPSI_bottom)
 DPSI_top_hat=transform(DPSI_top)
 u_hat=np.zeros_like(q_hat)
 v_hat=np.zeros_like(q_hat)
-w_hat=np.zeros_like(q_hat)
 
 ############################################################################
 
@@ -150,6 +149,12 @@ def nonlinear_term(q_hat,DPSI_bottom_hat,DPSI_top_hat):
             
     return transform(nlt_q,True), transform(nlt_bottom,True), transform(nlt_top,True),np.max(np.abs(V))
 
+
+
+## LinProfiler tell that all the computational cost is going to np.fft.irfft2(F_hat2,axes=(1,0)) for inverse_transform
+
+## LinProfiler tell that all the computational cost goes to np.fft.rfft2(F,axes=(1,0)) for transform
+
 ############################################################################
 
 def Euler(q_hat,DPSI_bottom_hat,DPSI_top_hat):
@@ -162,31 +167,28 @@ def Euler(q_hat,DPSI_bottom_hat,DPSI_top_hat):
     DPSI_top_hat-=dt*NLT_top_hat
     return maxV
 
-lp = LineProfiler()
-lp_wrapper = lp(Euler)
-lp_wrapper(q_hat,DPSI_bottom_hat,DPSI_top_hat)
-lp.print_stats()
+
     
 ############################################################################
     
 
-# for s in range(int(tmax//dt)):
-#     maxV=Euler(q_hat, DPSI_bottom_hat, DPSI_top_hat)
-#     plt.plot(s,maxV,'ob')
+for s in range(int(tmax//dt)):
+    maxV=Euler(q_hat, DPSI_bottom_hat, DPSI_top_hat)
+    plt.plot(s,maxV,'ob')
 
-# plt.figure()
-# plt.subplot(121)
-# u=inverse_transform(u_hat)
-# plt.contourf(u[:,Ny//2,:].T,levels=18)
-# plt.xlabel('x')
-# plt.ylabel('z')
-# plt.title('u')
-# plt.colorbar()
-# plt.subplot(122)
-# v=inverse_transform(v_hat)
-# plt.contourf(v[:,Ny//2,:].T,levels=18)
-# plt.colorbar()
-# plt.xlabel('x')
-# plt.ylabel('z')
-# plt.title('v')
-# plt.show()
+plt.figure()
+plt.subplot(121)
+u=inverse_transform(u_hat)
+plt.contourf(u[:,Ny//2,:].T,levels=18)
+plt.xlabel('x')
+plt.ylabel('z')
+plt.title('u')
+plt.colorbar()
+plt.subplot(122)
+v=inverse_transform(v_hat)
+plt.contourf(v[:,Ny//2,:].T,levels=18)
+plt.colorbar()
+plt.xlabel('x')
+plt.ylabel('z')
+plt.title('v')
+plt.show()
