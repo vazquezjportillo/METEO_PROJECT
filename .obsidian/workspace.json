@@ -30,7 +30,7 @@
                 "file": "biblio/unstability/The transition from symmetric to baroclinic instability.pdf",
                 "page": 3,
                 "left": -10,
-                "top": 285,
+                "top": 289,
                 "zoom": 1.5170759243578886
               }
             }
@@ -42,9 +42,9 @@
               "type": "pdf",
               "state": {
                 "file": "biblio/unstability/Asymptotic limit analysis for_numerical models of atmospheric_frontogenesisPHD.pdf",
-                "page": 226,
+                "page": 61,
                 "left": -10,
-                "top": 354,
+                "top": 682,
                 "zoom": 1.5169434010442218
               }
             }
@@ -56,9 +56,9 @@
               "type": "pdf",
               "state": {
                 "file": "biblio/unstability/Vertical slice modelling of nonlinear Eady waves.pdf",
-                "page": 14,
+                "page": 20,
                 "left": -1,
-                "top": 211,
+                "top": 332,
                 "zoom": 1.6591578900950297
               }
             }
@@ -75,7 +75,8 @@
               }
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -141,7 +142,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "biblio/unstability/Optimal Excitation of Baroclinic Waves in the Eady Mode.pdf",
+                "file": "biblio/unstability/The transition from symmetric to baroclinic instability.pdf",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -158,7 +159,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "biblio/unstability/Optimal Excitation of Baroclinic Waves in the Eady Mode.pdf",
+                "file": "biblio/unstability/The transition from symmetric to baroclinic instability.pdf",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -181,7 +182,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "biblio/unstability/Optimal Excitation of Baroclinic Waves in the Eady Mode.pdf"
+                "file": "biblio/unstability/The transition from symmetric to baroclinic instability.pdf"
               }
             }
           }
@@ -205,14 +206,14 @@
       "pdf-plus:PDF++: Toggle auto-paste": false
     }
   },
-  "active": "89b8f62c1cd00690",
+  "active": "d328a2fd5fe60fbf",
   "lastOpenFiles": [
-    "biblio/unstability/The transition from symmetric to baroclinic instability.pdf",
     "biblio/unstability/Asymptotic limit analysis for_numerical models of atmospheric_frontogenesisPHD.pdf",
     "biblio/unstability/Vertical slice modelling of nonlinear Eady waves.pdf",
+    "biblio/unstability/Optimal Excitation of Baroclinic Waves in the Eady Mode.pdf",
+    "biblio/unstability/The transition from symmetric to baroclinic instability.pdf",
     "biblio/unstability/PDF_Summary.md",
     "biblio/unstability/Eady Baroclinic Instability of a Circular Vortex.pdf",
-    "biblio/unstability/Optimal Excitation of Baroclinic Waves in the Eady Mode.pdf",
     "biblio/unstability/Non_linear_equilibration_2d_eady_waves.pdf",
     "biblio/unstability/On Baroclinic Instability over Continental Shelves_ Testing the Utility of.pdf",
     "biblio/unstability/Frontal_dynamics_near_front_collapse.pdf",
